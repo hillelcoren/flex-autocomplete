@@ -1,0 +1,129 @@
+<?xml version="1.0" encoding="utf-8"?>
+<hc:CloseableTitleWindow
+	xmlns:hc="com.hillelcoren.components.*"
+	xmlns:mx="http://www.adobe.com/2006/mxml"
+	implements="com.hillelcoren.components.autoComplete.interfaces.IBrowser"
+	layout="absolute" width="450" height="350" 
+	showCloseButton="false">
+	
+	<mx:Metadata>
+		[Event("change")]
+	</mx:Metadata>
+	
+	<mx:Script>
+		<![CDATA[
+			import mx.collections.ListCollectionView;
+			import com.hillelcoren.utils.StringUtils;
+			import com.hillelcoren.utils.ArrayCollectionUtils;
+			import mx.events.CollectionEvent;
+			import mx.events.CloseEvent;
+			import mx.managers.PopUpManager;
+			import mx.utils.ObjectUtil;
+			import mx.collections.IList;
+			import mx.events.DragEvent;
+			import mx.collections.ArrayCollection;
+			import com.hillelcoren.components.AutoComplete;
+			
+			[Bindable]
+			protected var _dataProvider:ListCollectionView;
+						
+			[Bindable]
+			protected var _selectedItems:Array; 
+			
+			[Bindable]
+			protected var _filterFunction:Function;
+			
+			[Bindable]
+			protected var _labelFunction:Function;
+			
+			[Bindable]
+			protected var _showOrderButtons:Boolean;
+			
+			public function set dataProvider( value:ListCollectionView ):void
+			{
+				_dataProvider = value;
+			}
+			
+			public function set selectedItems( value:Array ):void
+			{
+				_selectedItems = value;
+			}
+			
+			public function get selectedItems():Array
+			{
+				return listBuilder.selectedItems;
+			}
+			
+			public function set filterFunction( value:Function ):void
+			{
+				_filterFunction = value;
+			}
+			
+			public function set labelFunction( value:Function ):void
+			{
+				_labelFunction = value;
+			}
+			
+			public function set showOrderButtons( value:Boolean ):void
+			{
+				_showOrderButtons = value;
+			}
+			
+			public function init():void
+			{
+				okButton.setFocus();
+			}
+									
+			protected function handleOkClick():void
+			{
+				if (listBuilder.isChanged)
+				{
+					var changeEvent:Event = new Event( Event.CHANGE );
+					dispatchEvent( changeEvent );
+				}
+				else
+				{
+					handleCancelClick();
+				}
+			}
+			
+			protected function handleCancelClick():void
+			{
+				var event:CloseEvent = new CloseEvent( CloseEvent.CLOSE );
+				dispatchEvent( event );
+			}
+						
+			public function set browserFields( value:Array ):void
+			{
+				// do nothing (just here for the IBrowser interface)
+			}
+			
+			public function set allowMultipleSelection( value:Boolean ):void
+			{
+				// do nothing (just here for the IBrowser interface)
+			}
+
+			public function set searchStr( value:String ):void
+			{
+				// do nothing (just here for the IBrowser interface)
+			}
+	
+		]]>
+	</mx:Script>
+	
+	
+	<mx:VBox width="100%" height="100%">
+
+		<hc:ListBuilder id="listBuilder" width="100%" height="100%" 
+			dataProvider="{ _dataProvider }" selectedItems="{ _selectedItems }" 
+			filterFunction="{ _filterFunction }" labelFunction="{ _labelFunction }" showOrderButtons="{ _showOrderButtons }"/>
+		
+		<mx:HBox width="100%" horizontalAlign="center" verticalAlign="middle" 
+			paddingRight="10" paddingLeft="10" paddingTop="15" paddingBottom="15">
+			<mx:Button label="Cancel" minWidth="{ Consts.BUTTON_WIDTH }" click="handleCancelClick()"/>
+			<mx:Button id="okButton" label="OK" minWidth="{ Consts.BUTTON_WIDTH }" click="handleOkClick()"/>
+		</mx:HBox>
+
+	</mx:VBox>	
+
+</hc:CloseableTitleWindow>

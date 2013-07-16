@@ -1,0 +1,333 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:Canvas
+	xmlns:mx="http://www.adobe.com/2006/mxml"
+	xmlns="com.hillelcoren.components.autoComplete.classes.*"
+	verticalScrollPolicy="off" horizontalScrollPolicy="off"
+	borderStyle="inset" backgroundColor="#FFFFFF"
+	initialize="init()" clipContent="true" 
+	xmlns:components="com.hillelcoren.components.*">
+	
+	<mx:Metadata>
+		[Event(name="change")]
+		[Event(name="buttonClick")]		
+	</mx:Metadata>
+	
+	<mx:Script>
+		<![CDATA[
+			import com.hillelcoren.components.autoComplete.interfaces.iComboItem;
+			
+			import mx.containers.Canvas;
+			import mx.controls.Button;
+			import mx.controls.VRule;
+			import mx.core.Container;
+			import mx.core.EdgeMetrics;
+			import mx.core.IUIComponent;
+			import mx.core.UIComponent;
+			import mx.events.FlexEvent;
+			import mx.events.MenuEvent;
+			import mx.events.MoveEvent;
+			import mx.events.ResizeEvent;
+			import mx.managers.PopUpManager;
+			
+			protected var _showRemoveIcon:Boolean;
+			protected var _showRemoveIconChanged:Boolean;
+			
+			protected var _inlineButton:Button;
+			protected var _inlineButtonChanged:Boolean;
+			protected var _inlineButtonCanvas:Canvas;
+			
+			protected var _enableMultiRow:Boolean;
+			
+			protected var _tabIndex:int;
+			protected var _tabIndexChanged:Boolean;
+			
+			[Bindable]
+			public var showSpinner:Boolean;								
+			
+			protected function init():void
+			{
+				addEventListener( FocusEvent.FOCUS_IN, handleFocusIn );		
+				addEventListener( FocusEvent.FOCUS_OUT, handleFocusOut );		
+			}
+			
+			public function set buttonEnabled( value:Boolean ):void
+			{
+				if (_inlineButton)
+				{
+					_inlineButtonCanvas.enabled = value;
+				}
+			}
+			
+			protected function handleFocusIn( event:FocusEvent ):void
+			{
+				drawFocus( true );													
+			}
+			
+			protected function handleFocusOut( event:FocusEvent ):void
+			{
+				drawFocus( false );
+			}
+			
+			protected function handleChange( event:Event ):void
+			{
+				dispatchEvent( event );
+			}			
+			
+			override protected function commitProperties():void
+			{
+				super.commitProperties();
+				
+				if (_showRemoveIconChanged)
+				{
+					_showRemoveIconChanged = false;
+					
+					for each (var item:iComboItem in getChildren())
+					{
+						if (item is SelectedItem)
+						{
+							SelectedItem( item ).showRemoveIcon = _showRemoveIcon;	
+						}						
+					}
+				}
+				
+				if (_inlineButtonChanged)
+				{
+					_inlineButtonChanged = false;
+					
+					if (_inlineButton)
+					{
+						_inlineButton.tabEnabled = false;
+						_inlineButton.addEventListener( MouseEvent.MOUSE_DOWN, handleButtonMouseDown );
+						_inlineButton.addEventListener( MouseEvent.CLICK, handleButtonClick );
+						
+						_inlineButtonCanvas = new Canvas();
+						_inlineButtonCanvas.setStyle( "backgroundColor", "#FFFFFF" );
+						_inlineButtonCanvas.addChild( _inlineButton );
+						_inlineButton.hitArea = _inlineButtonCanvas;
+						
+						rawChildren.addChild( _inlineButtonCanvas );
+					}
+				}
+				
+				if (_tabIndexChanged)
+				{
+					_tabIndexChanged = false;
+					textInput.tabIndex = _tabIndex;
+				}
+			}
+						
+			protected function handleButtonMouseDown( event:Event ):void
+			{
+				event.stopPropagation();
+			}
+			
+			protected function handleButtonClick( event:Event ):void
+			{
+				var event:Event = new Event( "buttonClick" );
+				dispatchEvent( event );
+			}			
+			
+			override public function set tabIndex(value:int):void
+			{
+				_tabIndex = value;
+				_tabIndexChanged = true;
+				
+				invalidateProperties();
+			}
+
+			public function getItemPosition( comboItem:iComboItem ):Point
+			{
+				var lastY:int;
+				var col:uint;
+				var row:uint;
+				
+				for each (var item:UIComponent in getChildren())
+				{
+					if (item.y > lastY)
+					{
+						col = 0;
+						row++;
+						lastY = item.y;
+					}
+					
+					if (item == comboItem)
+					{
+						return new Point( col, row );
+					}
+					
+					col++;
+				}
+				
+				return null;
+			}
+			
+			public function getItemByPosition( pos:Point ):iComboItem
+			{
+				var lastY:int;
+				var row:uint;
+				var col:int;
+				var lastItem:UIComponent;
+				
+				for each (var item:UIComponent in getChildren())
+				{
+					if (item.y > lastY)
+					{
+						col = 0;
+						lastY = item.y;
+						row++;
+					}
+					
+					if (row == pos.y && col == pos.x)
+					{
+						return item as iComboItem;
+					}
+					
+					lastItem = item;
+					col++;
+				}
+				
+				return null;	
+			}								
+			
+			public function set inlineButton( value:Button ):void
+			{
+				if (_inlineButton)
+				{
+					rawChildren.removeChild( _inlineButtonCanvas );
+				}
+				
+				_inlineButton = value;
+				_inlineButtonChanged = true;
+				
+				invalidateProperties();
+			}
+			
+			public function set showRemoveIcon( value:Boolean ):void
+			{
+				_showRemoveIcon = value;
+				_showRemoveIconChanged = true;
+				
+				invalidateProperties();
+			}
+			
+			public function set enableMultiRow( value:Boolean ):void
+			{
+				_enableMultiRow = value;
+			}
+			
+	        override protected function measure():void
+	        {
+	        	super.measure();
+				
+				var comp:DisplayObject = getChildAt( numChildren - 1 );
+	        	var height:int = comp.y + comp.height;
+	        	
+	        	if (height > 0)
+	        	{
+	        		var vm:EdgeMetrics = viewMetricsAndPadding;
+	        		height += vm.bottom + vm.top;
+	        	
+	        		measuredHeight = measuredMinHeight = height;
+	        	}
+	        }
+		
+			/**
+			 * The flow layout algorithm was written by Eric Cancil
+			 * http://blog.appdivision.com/2009/02/18/flex-flowcontainer/
+			 */
+			override protected function updateDisplayList( unscaledWidth:Number, unscaledHeight:Number ):void
+			{	        	
+				super.updateDisplayList(unscaledWidth, unscaledHeight);
+				
+				var prevTallest:Number = 0;
+				var prevWidest:Number = 0;
+				var tallestForRow:Number = 0;
+				var rowNumber:Number = -1;    
+				var widestForColumn:Number = 0;
+				var columnNumber:Number = -1;        
+				
+				var vm:EdgeMetrics = viewMetricsAndPadding;
+				var sidePadding:int = vm.left + vm.right;
+							
+				for (var i:Number = 0; i < numChildren; i ++)
+				{
+					var child:UIComponent = getChildAt(i) as UIComponent;
+					var prevChild:DisplayObject;
+					
+					if (child.height >= tallestForRow)
+					{
+						prevTallest = tallestForRow;
+						tallestForRow = child.height;
+					}
+					
+					if (i == 0)
+					{
+						child.x = child.y = 0;
+					}
+					else
+					{
+						prevChild = getChildAt(i - 1);
+						
+						var newWidth:Number = prevChild.width + prevChild.x;
+						var newHeight:Number = prevChild.y;
+						
+						if (_enableMultiRow && newWidth + child.minWidth > width - sidePadding)
+						{
+							child.x = 0;
+							
+							if (child.height == tallestForRow)
+							{
+								child.y = newHeight + prevTallest;
+							}
+							else
+							{
+								child.y = newHeight + tallestForRow;
+							}
+							
+							tallestForRow = child.height;                 
+						}
+						else
+						{
+							child.x = newWidth;
+							child.y = prevChild.y;
+						}
+					}
+					
+					if (child is PromptTextInput)
+					{
+						if (child.width + sidePadding > width)
+						{
+							child.width = width - sidePadding;
+						}
+						
+						child.percentWidth = 100;
+					}
+				}
+				
+				if (_inlineButton)
+				{
+					_inlineButtonCanvas.width = _inlineButton.measuredWidth;
+					_inlineButtonCanvas.height = textInput.height;
+					
+					_inlineButtonCanvas.x = width - _inlineButtonCanvas.width - 1;
+					_inlineButtonCanvas.y = height - textInput.height - vm.bottom;
+					
+					if (verticalScrollBar)
+					{
+						_inlineButtonCanvas.x -= 16;
+					}
+					
+					_inlineButton.y = _inlineButtonCanvas.height - _inlineButton.measuredHeight - ((textInput.height - _inlineButton.measuredHeight) / 2);
+					
+					textInput.textPadding = _inlineButtonCanvas.width + vm.right;
+				}				
+			}           
+
+						
+		]]>
+	</mx:Script>
+	
+	<components:PromptTextInput id="textInput" enableClearIcon="false" width="100%"
+		change="handleChange(event)" drawFocusBorder="false" borderStyle="none" showSpinner="{ showSpinner }"/>
+		
+</mx:Canvas>

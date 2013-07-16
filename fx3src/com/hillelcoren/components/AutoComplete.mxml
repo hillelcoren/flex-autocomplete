@@ -1,0 +1,1792 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:Grid
+	xmlns:mx="http://www.adobe.com/2006/mxml"
+	xmlns:components="com.hillelcoren.components.*" 
+	xmlns:classes="com.hillelcoren.components.autoComplete.classes.*"
+	implements="mx.controls.listClasses.IDropInListItemRenderer,mx.managers.IFocusManagerComponent"
+	clipContent="false"
+	verticalAlign="middle" horizontalAlign="left"
+	verticalScrollPolicy="off" horizontalScrollPolicy="off"
+	initialize="init()">
+	
+	<mx:Metadata>
+		
+		[IconFile("icon.png")]
+		
+		/**
+		 * Dispatched when the selected items are changed by the user
+		 */
+		[Event(name="change")]
+		/**
+		 * Dispatched when the text in the search field is changed
+		 */
+		[Event(name="searchChange")]
+		/**
+		 * Dispatched when the selected items are changed either by the user or programmitcally
+		 */
+		[Event(name="valueCommit")]
+		/**
+		 * The color for the prompt shown when no value is set
+		 */
+		[Style(name="promptColor", type="uint", format="Color", inherit="yes")]
+		
+		/**
+		 * The style/skin for the selected item
+		 */
+		[Style(name="selectedItemStyleName", type="String", inherit="yes", enumeration="macMail,facebook,underline,none")]
+		
+	</mx:Metadata>
+		
+	<mx:Script>
+		<![CDATA[
+			import com.hillelcoren.components.AutoComplete;
+			import com.hillelcoren.components.PromptTextInput;
+			import com.hillelcoren.components.autoComplete.classes.DropDownItemRenderer;
+			import com.hillelcoren.components.autoComplete.classes.EditableItem;
+			import com.hillelcoren.components.autoComplete.classes.IconButton;
+			import com.hillelcoren.components.autoComplete.classes.SelectedItem;
+			import com.hillelcoren.components.autoComplete.interfaces.iComboItem;
+			import com.hillelcoren.utils.KeyboardUtil;
+			import com.hillelcoren.utils.StringUtils;
+			
+			import mx.collections.ArrayCollection;
+			import mx.collections.ListCollectionView;
+			import mx.controls.Button;
+			import mx.controls.List;
+			import mx.controls.Text;
+			import mx.controls.TextArea;
+			import mx.controls.TextInput;
+			import mx.controls.dataGridClasses.DataGridListData;
+			import mx.controls.listClasses.BaseListData;
+			import mx.core.Application;
+			import mx.core.UIComponent;
+			import mx.core.UITextField;
+			import mx.effects.easing.Back;
+			import mx.events.CollectionEvent;
+			import mx.events.CollectionEventKind;
+			import mx.events.FlexEvent;
+			import mx.events.FlexMouseEvent;
+			import mx.events.ListEvent;
+			import mx.events.MenuEvent;
+			import mx.events.MoveEvent;
+			import mx.events.ResizeEvent;
+			import mx.events.ScrollEvent;
+			import mx.managers.CursorManager;
+			import mx.managers.FocusManager;
+			import mx.managers.PopUpManager;
+			import mx.utils.ObjectUtil;
+			import mx.utils.StringUtil;
+			
+			protected var _dropDown:List;
+			protected var _matchType:String = MATCH_WORD;
+			
+			[Bindable]
+			protected var _dataProvider:ListCollectionView;
+			protected var _dataProviderChanged:Boolean;
+			
+			protected var _searchText:String;
+			
+			protected var _filterFunction:Function;
+			protected var _labelField:String;
+			protected var _labelFunction:Function;
+			protected var _dropDownLabelFunction:Function;
+			protected var _dropDownItemRenderer:IFactory;
+			protected var _dropDownWidth:int;
+			
+			protected var _backspaceAction:String;
+			protected var _delimiter:String = ",";
+			
+			protected var _autoSelectEnabled:Boolean = true;
+			protected var _autoSelectFunction:Function;	
+			
+			protected var _allowMultipleSelection:Boolean;
+			protected var _allowMultipleSelectionChanged:Boolean;
+			
+			protected var _showSelectedItems:Boolean = true;
+			
+			protected var _allowNewValues:Boolean;
+			
+			protected var _prompt:String;
+			protected var _promptChanged:Boolean;
+			
+			protected var _text:String;
+			protected var _textChanged:Boolean;
+						
+			protected var _enableClearIcon:Boolean;
+			protected var _enableClearIconChanged:Boolean;
+			
+			protected var _showRemoveIcon:Boolean;
+			protected var _showRemoveIconChanged:Boolean;
+			
+			protected var _errorStr:String;
+			protected var _errorStrChanged:Boolean;
+			
+			[Bindable]
+			protected var _selectedItems:ArrayCollection;
+			protected var _selectedItemsChanged:Boolean;
+			protected var _initialSelectedItems:ArrayCollection;
+			
+			protected var _selectedItem:Object;
+			protected var _selectedItemChanged:Boolean;
+			
+			protected var _selectedItemId:Number;
+			protected var _selectedItemIdChanged:Boolean;
+			
+			protected var _disabledItems:ArrayCollection;
+			
+			protected var _inlineButton:Button;
+			protected var _inlineButtonChanged:Boolean;
+						
+			protected var _allowDuplicates:Boolean;
+			protected var _allowEditingNewValues:Boolean;
+			protected var _allowEditingSelectedValues:Boolean;
+			
+			protected var _keyField:String = "id";
+			protected var _listData:DataGridListData;
+			protected var _dropDownRowCount:uint = 5;
+			
+			protected var _maxHeight:Number;
+			protected var _maxHeightChanged:Boolean;
+			
+			protected var _tabIndex:int;
+			protected var _tabIndexChanged:Boolean;
+			
+			protected var _clearSearchOnFocusOut:Boolean = true;
+			
+			public static const SEARCH_CHANGE:String = "searchChange";
+			
+			public static const STYLE_UNDERLINE:String 	= "underline";
+			public static const STYLE_MAC_MAIL:String 	= "macMail";
+			public static const STYLE_FACEBOOK:String 	= "facebook";
+			
+			public static const LAYOUT_VERTICAL:String 		= "vertical";
+			public static const LAYOUT_HORIZONTAL:String 	= "horizontal";
+			
+			public static const BACKSPACE_FOCUS:String 	= "focus";
+			public static const BACKSPACE_REMOVE:String = "remove";
+			
+			public static const MATCH_BEGINNING:String 	= "beginning";
+			public static const MATCH_WORD:String		= "word";
+			public static const MATCH_ANY_PART:String	= "anyPart";
+			
+			private function init():void
+			{
+				_selectedItems = new ArrayCollection();
+				_selectedItems.addEventListener( CollectionEvent.COLLECTION_CHANGE, handleSelectedItemsChange );
+				
+				if (!_disabledItems)
+				{
+					_disabledItems = new ArrayCollection();
+				}
+				
+				if (_labelFunction == null)
+				{
+					labelFunction = defaultLabelFunction;
+				}
+
+				if (_filterFunction == null)
+				{
+					filterFunction = defaultFilterFunction;
+				}				
+
+				if (_dropDownLabelFunction == null)
+				{			
+					dropDownLabelFunction = defaultDropDownLabelFunction;
+				}
+				
+				if (!width && !percentWidth)
+				{
+					width = DEFAULT_MEASURED_WIDTH;
+				}
+				
+				// FLEX4
+				//tabFocusEnabled = true;
+				//hasFocusableChildren = true;
+				
+				addEventListener( MoveEvent.MOVE, handleMove );
+				addEventListener( KeyboardEvent.KEY_DOWN, handleKeyDown );
+				addEventListener( FocusEvent.FOCUS_OUT, handleFocusOut );
+				addEventListener( FocusEvent.FOCUS_IN, handleFocusIn );
+			}
+			
+			protected function handleMove( event:MoveEvent ):void
+			{
+				positionDropDown();
+			}
+			
+			protected function handleFlowBoxResize():void
+			{
+				positionDropDown();
+			}			
+			
+			protected function handleFocusOut( event:FocusEvent ):void
+			{
+				var commitEvent:FlexEvent = new FlexEvent( FlexEvent.VALUE_COMMIT );
+				dispatchEvent( commitEvent );				
+				
+				if (event.relatedObject && contains( event.relatedObject ))
+				{
+					return;
+				}
+				
+				if (searchText.length > 0)
+				{
+					if (_allowNewValues)
+					{
+						_selectedItems.addItem( searchText );
+						dispatchEvent( new Event( Event.CHANGE ) );
+					}
+					else if (_clearSearchOnFocusOut)
+					{	
+						searchText = null;
+					}
+				}	
+			}
+			
+			protected function handleFocusIn( event:FocusEvent ):void
+			{
+				if (event.relatedObject && contains( event.relatedObject ))
+				{
+					return;
+				}				
+				
+				if (focusManager.getFocus() == _inlineButton)
+				{
+					setFocus();
+				}
+			}
+						
+			override protected function commitProperties():void
+			{
+				super.commitProperties();
+				
+				var item:Object;
+				var i:int;
+				
+				if (_textChanged)
+				{
+					_textChanged = false;
+					
+					addItem( null );
+					textInput.text = _text;
+				}
+			
+				if (_allowMultipleSelectionChanged)
+				{
+					_allowMultipleSelectionChanged = false;
+					
+					_selectedItems.removeAll();
+					flowBox.enableMultiRow = _allowMultipleSelection;
+					setClearIconEnabled();					
+					searchText = null;					
+				}				
+				
+				if (_enableClearIconChanged)
+				{
+					_enableClearIconChanged = false;
+					setClearIconEnabled();
+				}
+				
+				if (_promptChanged)
+				{
+					_promptChanged = false;
+					textInput.prompt = _prompt;
+				}
+				
+				if (_inlineButtonChanged)
+				{
+					_inlineButtonChanged = false;
+					flowBox.inlineButton = _inlineButton;	
+				}
+				
+				if (_showRemoveIconChanged)
+				{
+					_showRemoveIconChanged = false;
+					flowBox.showRemoveIcon = _showRemoveIcon;
+				}		
+				
+				if (_maxHeightChanged)
+				{
+					_maxHeightChanged = false;
+					flowBox.maxHeight = _maxHeight;
+				}				
+				
+				if (_dataProviderChanged && _dataProvider)
+				{
+					_dataProviderChanged = false;
+					
+					_dataProvider.addEventListener( CollectionEvent.COLLECTION_CHANGE, handleDataProviderChange, false, 0, true );
+					_dataProvider.refresh();
+					
+					if (_dropDown)
+					{
+						_dropDown.dataProvider = _dataProvider;
+					}					
+				}	
+
+				if (_selectedItemChanged && _dataProvider)
+				{
+					_selectedItemChanged = false;
+					clear();
+					
+					if (_selectedItem)
+					{
+						_selectedItems.addItem( _selectedItem );
+					}
+					
+					_selectedItem = null;
+				}
+				
+				if (_selectedItemIdChanged && _dataProvider)
+				{
+					_selectedItemIdChanged = false;
+					_selectedItems.removeAll();
+					
+					for (i=0; i<_dataProvider.list.length; i++)
+					{
+						item = _dataProvider.list.getItemAt(i);
+						
+						if (item.hasOwnProperty( _keyField ) && item[ _keyField ] == _selectedItemId)
+						{
+							_selectedItems.addItem( item );
+							_selectedItemId = 0;
+							break;
+						}
+					}
+				}
+								
+				if (_selectedItemsChanged && _dataProvider)
+				{
+					_selectedItemsChanged = false;
+					_selectedItems.removeAll();
+					
+					for each (var selectedItem:Object in _initialSelectedItems)
+					{
+						var foundItem:Object = null;
+						
+						for (i=0; i<_dataProvider.list.length; i++)
+						{
+							item = _dataProvider.list.getItemAt(i);
+							
+							if (item == selectedItem)
+							{
+								foundItem = item;
+							}
+							else if (item.hasOwnProperty( _keyField ) 
+										&& selectedItem.hasOwnProperty( _keyField )
+										&& item[_keyField] == selectedItem[_keyField])
+							{
+								foundItem = item;
+							}
+							
+							if (foundItem)
+							{
+								_selectedItems.addItem( foundItem );
+								foundItem = true;
+								break;
+							}
+						}
+						
+						if (foundItem == null)
+						{
+							_selectedItems.addItem( selectedItem );																		
+						}
+					}
+					
+					_initialSelectedItems = null;
+				}
+				
+				if (_tabIndexChanged)
+				{
+					_tabIndexChanged = false;
+					flowBox.tabIndex = _tabIndex;
+				}
+				
+				if (_errorStrChanged)
+				{
+					_errorStrChanged = false;
+					flowBox.errorString = _errorStr;
+					
+					var focused:DisplayObject = focusManager.getFocus() as DisplayObject;
+					var drawFocus:Boolean = focused && flowBox.contains( focused );
+					flowBox.drawFocus( drawFocus );					
+				}				
+			}
+
+			protected function handleDataProviderChange( event:CollectionEvent ):void
+			{
+				if (event.kind == CollectionEventKind.REMOVE)
+				{
+					for each (var item:Object in event.items)
+					{
+						var index:int = _selectedItems.getItemIndex( item );
+						
+						if (index >= 0)
+						{
+							_selectedItems.removeItemAt( index );
+						}
+					}
+				}
+			}
+			
+			protected function handleSelectedItemsChange( event:CollectionEvent ):void
+			{
+				var item:Object;
+				
+				if (event.kind == CollectionEventKind.REMOVE)
+				{
+					removeItemAt( event.location );					
+				}
+				else if (event.kind == CollectionEventKind.RESET)
+				{
+					removeAll();
+				}	
+				else if (event.kind == CollectionEventKind.ADD)
+				{
+					hideDropDown();
+					
+					for each (item in event.items)
+					{
+						if (!item)
+						{
+							silentlyRemove( item );
+						}
+						
+						if (checkIfDuplicate( item ))
+						{
+							continue;
+						}
+						
+						if (checkIfUnavailable( item ))
+						{
+							continue;
+						}
+						
+						addItem( item );											
+					}
+					
+					searchText = null;									
+				}
+				
+				/*
+				This caused the component to lose the key typed when there
+				was already a value selected. The purpose was to show the prompt
+				if there are no selected items
+				if (_selectedItems.length == 0)
+				{
+					searchText = null;
+				}
+				*/
+				
+				var commitEvent:FlexEvent = new FlexEvent( FlexEvent.VALUE_COMMIT );
+				callLater( dispatchEvent, [ commitEvent ] );				
+			}
+			
+			protected function checkIfDuplicate( searchFor:Object ):Boolean
+			{
+				if (_allowDuplicates)
+				{
+					return false;
+				}
+				
+				var count:int;
+				
+				for each (var item:Object in _selectedItems.source)
+				{
+					if (item == searchFor || 
+						(item.hasOwnProperty( _keyField )
+							&& searchFor.hasOwnProperty( _keyField )
+							&& item[_keyField] == searchFor[_keyField]))
+					{
+						count++;
+					}
+				} 
+								
+				if (count > 1)
+				{
+					silentlyRemove( item );
+					return true;
+				}
+				
+				return false;
+			}
+			
+			protected function checkIfUnavailable( item:Object ):Boolean
+			{
+				var index:int = _disabledItems.getItemIndex( item );
+				
+				if (index >= 0)
+				{
+					silentlyRemove( item );
+					return true;
+				}
+				
+				return false;
+			}
+			
+			protected function silentlyRemove( item:Object ):void
+			{
+				_selectedItems.removeEventListener( CollectionEvent.COLLECTION_CHANGE, handleSelectedItemsChange );
+				
+				var index:int = _selectedItems.getItemIndex( item );
+				_selectedItems.removeItemAt( index );
+				
+				_selectedItems.addEventListener( CollectionEvent.COLLECTION_CHANGE, handleSelectedItemsChange );				
+			}
+				
+			/**
+			 * This will cause the component to research the dataProvider and display the popUp if 
+			 * there are any matches. This is useful when using a dynamic dataProvider. Simply call
+			 * this function once the data has been returned from the server
+			 */
+			public function search():void
+			{
+				validateNow();
+				handleFlowBoxChange( null );
+			}			
+			
+			public function get listData():BaseListData
+            {
+            	return _listData;
+            }
+			
+            public function set listData( value:BaseListData ):void
+            {
+            	enableClearIcon = false;
+            	
+            	_listData = DataGridListData( value );            	
+            } 
+            
+            override public function set data( value:Object ):void
+            {
+                super.data = value;
+				
+				if (!data || !data[ _listData.dataField ])
+				{
+					return;
+				}
+				
+				callLater( callLater, [_setData] );				
+            }
+            
+            protected function _setData():void
+            {
+            	var value:Object = data[ _listData.dataField ];
+            	
+            	if (value is Array)
+            	{
+            		selectedItems = new ArrayCollection( value as Array );            			
+            	}
+            	else if (value is ArrayCollection)
+            	{
+            		selectedItems = value as ArrayCollection;
+            	}
+            	else
+            	{
+            		selectedItem = value;
+            	}           	
+            }			
+			
+            public function get selectedItemId():Number
+            {
+            	if (selectedItem && selectedItem.hasOwnProperty( _keyField ))
+            	{
+            		return selectedItem[ _keyField ];
+            	}	
+            	
+            	return NaN;
+            }
+            
+			protected function defaultFilterFunction( item:Object, searchStr:String ):Boolean
+			{
+				if (!searchStr || searchStr.length == 0)
+				{
+					return true;
+				}
+				
+				var str:String = labelFunction( item );
+				
+				switch (_matchType)
+				{
+					case MATCH_ANY_PART:
+						return StringUtils.contains( str, searchStr );
+					case MATCH_BEGINNING:
+						return StringUtils.beginsWith( str, searchStr );
+					case MATCH_WORD:
+						return StringUtils.anyWordBeginsWith( str, searchStr );
+				}
+				
+				return false;
+			}
+									
+			protected function defaultLabelFunction( item:Object ):String
+			{
+				if (_labelField && item.hasOwnProperty( _labelField ))
+				{
+					return item[ _labelField ];
+				}
+				else
+				{
+					return item.toString();
+				}
+			}
+				
+			/**
+			 * The default function used to determine the text to display in the dropdown when searching.
+			 * It will try to find the part of the item which matched the search string and highlight
+			 * it by making bold and underlined
+			 */
+			public function defaultDropDownLabelFunction( item:Object ):String
+			{
+				var string:String = _labelFunction( item );
+				var searchStr:String = searchText;
+				
+				if (string == null)
+				{
+					return "";
+				}
+								
+				// there are problems using ">"s and "<"s in HTML
+				string = string.replace( "<", "&lt;" ).replace( ">", "&gt;" );				
+
+				var returnStr:String = StringUtils.highlightMatch( string, searchStr );
+				
+				if (_selectedItems.getItemIndex( item ) >= 0 || _disabledItems.getItemIndex( item ) >= 0)
+    			{
+    				returnStr = "<font color='" + Consts.COLOR_TEXT_DISABLED + "'>" + returnStr + "</font>";
+    			}
+    			
+    			return returnStr;
+			}
+												
+			protected function setClearIconEnabled():void
+			{
+				textInput.enableClearIcon = _enableClearIcon && !_allowMultipleSelection;
+			}
+			
+			protected function createDropDown():void
+			{
+				_dropDown = new List();
+				_dropDown.focusEnabled 	= false;
+				_dropDown.dataProvider 	= _dataProvider;
+				_dropDown.labelFunction = _dropDownLabelFunction;
+				_dropDown.rowCount		= _dropDownRowCount;
+				_dropDown.itemRenderer  = _dropDownItemRenderer ? _dropDownItemRenderer : new ClassFactory( DropDownItemRenderer );
+				_dropDown.addEventListener( ListEvent.ITEM_CLICK, handleDropDownItemClick );				
+				
+				systemManager.addEventListener( MouseEvent.MOUSE_DOWN, handleMouseDown );				
+			}
+			
+			/**
+			 * If the list is visible and we click somewhere else we're going to close it
+			 */
+			protected function handleMouseDown( event:MouseEvent ):void
+			{
+				if (!isDropDownVisible())
+				{
+					return;
+				}
+				
+				var p:Point = _dropDown.localToGlobal( new Point( 0, 0 ) );
+				var rect:Rectangle = new Rectangle( p.x, p.y, _dropDown.width, _dropDown.height );
+				
+				if (!rect.contains( event.stageX, event.stageY ))
+				{
+					hideDropDown();
+				}
+			}			
+			
+			protected function handleKeyDown( event:KeyboardEvent ):void
+			{
+				if (isDropDownVisible())
+				{
+					if (event.keyCode == Keyboard.DOWN)
+					{
+						if (_dropDown.selectedIndex == _dataProvider.length - 1)
+						{
+							_dropDown.selectedIndex = 0;
+						}
+						else
+						{
+							_dropDown.selectedIndex++;
+						}
+						
+						_dropDown.scrollToIndex( _dropDown.selectedIndex );
+						textInput.setCursorPosition( textInput.selectionBeginIndex );						
+					}
+					else if (event.keyCode == Keyboard.UP)
+					{
+						if (_dropDown.selectedIndex == 0)
+						{
+							_dropDown.selectedIndex = _dataProvider.length - 1;
+						}
+						else
+						{
+							_dropDown.selectedIndex--;						
+						}
+						
+						_dropDown.scrollToIndex( _dropDown.selectedIndex );
+						textInput.setCursorPosition( textInput.selectionBeginIndex );							
+					}
+					else if (event.keyCode == Keyboard.ESCAPE)
+					{
+						hideDropDown();
+					}
+					else if (event.keyCode == Keyboard.ENTER || event.keyCode == Keyboard.TAB 
+						|| (String.fromCharCode(event.charCode) == _delimiter && _allowMultipleSelection))
+					{
+						_selectedItems.addItem( _dropDown.selectedItem );
+						dispatchEvent( new Event( Event.CHANGE ) );
+					}
+				}
+				else
+				{
+					if (!focusManager)
+					{
+						return;
+					}
+					
+					var target:iComboItem = determineFocus();
+					
+					if (!target)
+					{
+						return;
+					}
+					
+					var focused:DisplayObject = focusManager.getFocus() as DisplayObject;
+					var comboItem:iComboItem;
+					var item:Object;
+					
+					var index:int = flowBox.getChildIndex( target as DisplayObject );
+					var pos:Point;
+					
+					if (event.keyCode == Keyboard.BACKSPACE)
+					{
+						if (_selectedItems.length == 0)
+						{
+							return;
+						}
+						
+						if (!target.isCursorAtBeginning())
+						{
+							return;
+						}
+						
+						if (target is EditableItem)
+						{
+							if (EditableItem( target ).isTextSelected())
+							{
+								return;
+							}
+						}
+						
+						if (focused is IconButton)
+						{							
+							_selectedItems.removeItemAt( index );
+							iComboItem( flowBox.getChildAt( index ) ).setTextFocus();
+							dispatchEvent( new Event( Event.CHANGE ) );																														
+						}
+						else
+						{
+							if (index == 0)
+							{
+								return;
+							}
+							
+							if (_allowEditingSelectedValues)
+							{
+								item = _selectedItems.getItemAt( index - 1 );
+								
+								_selectedItems.removeItemAt( index - 1 );
+								dispatchEvent( new Event( Event.CHANGE ) );
+								
+								var label:String = labelFunction( item ); 
+								searchText = label.substr( 0, label.length - 1 );
+								
+								textInput.setFocus();
+								textInput.setTextSelected(false);
+							}
+							else if (_backspaceAction == AutoComplete.BACKSPACE_REMOVE)
+							{
+								_selectedItems.removeItemAt( index - 1 );
+								dispatchEvent( new Event( Event.CHANGE ) );																														
+								iComboItem( flowBox.getChildAt( index - 1 ) ).setTextFocus();
+							}
+							else
+							{
+								var prevItem:UIComponent = flowBox.getChildAt( index - 1 ) as UIComponent;
+								prevItem.setFocus();
+								
+								if (prevItem is SelectedItem)
+								{
+									SelectedItem( prevItem ).selected = true;
+								}
+								else if (prevItem is EditableItem)
+								{
+									EditableItem( prevItem ).setSelectionEnd();
+								}
+							}
+						}												
+					}
+					else if (event.keyCode == Keyboard.UP)
+					{
+						pos = flowBox.getItemPosition( target );
+						pos.y--;
+							
+						comboItem = flowBox.getItemByPosition( pos );
+						
+						if (comboItem)
+						{
+							comboItem.setTextFocus();
+						}
+					}
+					else if (event.keyCode == Keyboard.DOWN)
+					{
+						pos = flowBox.getItemPosition( target );
+						pos.y++;
+						
+						comboItem = flowBox.getItemByPosition( pos );
+						
+						if (comboItem)
+						{
+							comboItem.setTextFocus();
+						}
+					}
+					else if (event.keyCode == Keyboard.LEFT)
+					{
+						if (target is EditableItem)
+						{
+							if (EditableItem( target ).isTextSelected())
+							{
+								EditableItem( target ).setSelectionBeginning();
+								return;
+							}
+						}
+						
+						if (index > 0)
+						{
+							if (!target.isCursorAtBeginning())
+							{
+								return;
+							}
+							
+							// if you press left when a SelectedItem is focused then we'll move the
+							// cursor to the left of the focused item (rather than one item back)
+							if (focused is IconButton)
+							{
+								comboItem = flowBox.getChildAt( index ) as iComboItem;
+							}
+							else
+							{				
+								comboItem = flowBox.getChildAt( index - 1 ) as iComboItem;
+							}
+							
+							comboItem.setTextFocus();
+							
+							if (comboItem is EditableItem)
+							{
+								EditableItem( comboItem ).setSelectionEnd();
+							}
+						}
+						else if (index == 0 && focused is IconButton)
+						{
+							SelectedItem( flowBox.getChildAt( 0 ) ).setTextFocus();
+						}		
+					}
+					else if (event.keyCode == Keyboard.RIGHT)
+					{
+						if (index < flowBox.numChildren - 1)
+						{
+							if (!target.isCursorAtEnd())
+							{
+								return;
+							}							
+							
+							comboItem = flowBox.getChildAt( index + 1 ) as iComboItem;
+							comboItem.setTextFocus();
+							
+							if (comboItem is EditableItem)
+							{
+								EditableItem( comboItem ).setSelectionBeginning();
+							}
+						}
+					}
+					else if (event.keyCode == Keyboard.ENTER 
+							|| (String.fromCharCode(event.charCode) == _delimiter && _allowMultipleSelection))
+					{
+						if (target is EditableItem)
+						{
+							// we're going to remove and then re-add it so that we
+							// can run the unqiue check against it
+							_selectedItems.removeItemAt( index );
+							_selectedItems.addItemAt( EditableItem( target ).item, index );
+							
+							textInput.setFocus();
+						}
+						else if (target.text && _allowNewValues && target.isEditable())
+						{
+							_selectedItems.addItem( target.text );
+							dispatchEvent( new Event( Event.CHANGE ) );																														
+							return;
+						}
+						else if (event.keyCode == Keyboard.ENTER)
+						{
+							textInput.setFocus();
+						}
+					}
+				}
+			}
+			
+			protected function determineFocus():iComboItem
+			{
+				var comp:UIComponent = focusManager.getFocus() as UIComponent;
+			
+				if (comp is iComboItem)
+				{
+					return comp as iComboItem;
+				}
+				
+				for each (var item:iComboItem in flowBox.getChildren())
+				{
+					if (item.contains( comp ))
+					{
+						return item;
+					}	
+				}
+				
+				return null;
+			}
+			
+			public function clear():void
+			{
+				textInput.enablePrompt = true;
+				searchText = null;
+				selectedItems.removeAll();				
+			}
+						
+			public function removeItemAt( index:int ):void
+			{
+				if (!_showSelectedItems)
+				{
+					return;
+				}
+				
+				flowBox.removeChildAt( index );
+				
+				textInput.enablePrompt = flowBox.numChildren == 1;			
+			}
+			
+			public function removeAll():void
+			{
+				if (!_showSelectedItems)
+				{
+					return;
+				}
+				
+				while (flowBox.numChildren > 1)
+				{
+					flowBox.removeChildAt( 0 );	
+				}
+				
+				textInput.enablePrompt = flowBox.numChildren == 1;
+			}
+			
+			public function addItem( item:Object ):void
+			{
+				if (!_showSelectedItems)
+				{
+					return;
+				}
+				
+				if (flowBox.numChildren == 2 && !_allowMultipleSelection)
+				{
+					selectedItems.removeItemAt( 0 );				
+				}
+				
+				var isNew:Boolean = item is String && (!_dataProvider || _dataProvider.getItemIndex( item ) == -1);
+				
+				if (isNew)
+				{
+					item = StringUtils.trimCommas( item as String );
+				}
+				
+				if (item)
+				{
+					if (isNew && _allowEditingNewValues)
+					{
+						var editableItem:EditableItem = new EditableItem();
+						editableItem.allowMultipleSelection = _allowMultipleSelection;
+						editableItem.text = item + (_allowMultipleSelection ? _delimiter : "");
+						editableItem.width = measureText( item as String ).width + 10;
+						editableItem.height = textInput.height;
+						editableItem.item = item;
+						editableItem.addEventListener( Event.CHANGE, handleEditableItemChange, false, 0, true );
+						flowBox.addChildAt( editableItem, flowBox.numChildren - 1 );									
+					}
+					else
+					{
+						var selectedItem:SelectedItem = new SelectedItem();
+						selectedItem.text = _labelFunction( item );
+						selectedItem.item = item;
+						selectedItem.height = textInput.height;
+						selectedItem.allowMultipleSelection = _allowMultipleSelection;
+						selectedItem.showRemoveIcon = _showRemoveIcon;
+						selectedItem.addEventListener( SelectedItem.REMOVE_ITEM, handleItemRemove, false, 0, true );
+						selectedItem.addEventListener( TextEvent.TEXT_INPUT, handleItemTextInput );
+						flowBox.addChildAt( selectedItem, flowBox.numChildren - 1 );						
+					}
+				}
+				
+				textInput.enablePrompt = flowBox.numChildren == 1;
+			}
+			
+			protected function handleItemRemove( event:Event ):void
+			{
+				var index:int;
+				
+				for each (var child:DisplayObject in flowBox.getChildren())
+				{
+					if (child == event.currentTarget)
+					{
+						break;
+					}
+					
+					index++;
+				} 
+				
+				_selectedItems.removeItemAt( index );
+				dispatchEvent( new Event( Event.CHANGE ) );
+			}
+			
+			protected function handleItemTextInput( event:TextEvent ):void
+			{
+				if (event.text != _delimiter)
+				{
+					textInput.text = event.text;
+					textInput.validateNow();
+				}
+				
+				textInput.setFocus();
+				textInput.setTextSelected(false);
+				handleFlowBoxChange( null ); 
+			}
+			
+			protected function handleEditableItemChange( event:Event ):void
+			{
+				var editableItem:EditableItem = event.currentTarget as EditableItem;
+				var index:int = flowBox.getChildIndex( editableItem );
+				
+				var text:String = editableItem.text;
+				text = StringUtils.trimCommas( text );
+				
+				if (text.length > 0)
+				{
+					_selectedItems.setItemAt( text, index );
+					editableItem.item = text;				
+				}
+				else
+				{
+					_selectedItems.removeItemAt( index );
+					
+					var comboItem:iComboItem = flowBox.getChildAt( index ) as iComboItem;
+					comboItem.setTextFocus();
+				}
+			}
+			
+			protected function handleDropDownItemClick( event:ListEvent ):void
+			{
+				_selectedItems.addItem( _dropDown.selectedItem );
+				dispatchEvent( new Event( Event.CHANGE ) );
+			}
+			
+			public function handleFlowBoxChange( event:Event ):void
+			{
+				flowBox.invalidateDisplayList();
+				
+				if (selectedItem && !_allowMultipleSelection && searchText)
+				{
+					_selectedItems.removeAll();							
+				}
+				
+				if (event)
+				{
+					var event:Event = new Event( AutoComplete.SEARCH_CHANGE );
+					dispatchEvent( event );
+				}
+				
+				if (!_dataProvider)
+				{
+					return;
+				}				
+				
+				// we're splitting by a delimeter to handle the case where the 
+				// user enters a comma separated list of values
+				var parts:Array;
+				
+				if (_delimiter != null && _allowMultipleSelection)
+				{
+					parts = searchText.split( _delimiter );
+				}
+				else
+				{
+					parts = [ searchText ];
+				}
+				
+				for each (var searchStr:String in parts)
+				{
+					_searchText = searchStr;					
+					filterData();
+					
+					if (_autoSelectEnabled)
+					{
+						if (isPerfectMatch())
+						{
+							_searchText = "";
+							continue;
+						}						
+					}
+					
+					if (_allowNewValues && parts.length > 1)
+					{
+						_selectedItems.addItem( searchStr );						
+					}					
+				}
+				
+				if (searchText && searchText != _searchText)
+				{
+					textInput.text = _searchText;
+				}
+				
+				if (_dataProvider.length == 0)
+				{
+					hideDropDown();
+					return;
+				}
+				
+				if (isDropDownVisible())
+				{
+					if (searchStr.length == 0)
+					{
+						hideDropDown();
+					}
+				}
+				else
+				{
+					if (_searchText && _searchText.length > 0 && _dataProvider.length > 0)
+					{
+						showDropDown();	
+					}
+				}
+				
+				if (isDropDownVisible())
+				{
+					_dropDown.rowCount = (_dataProvider.length < _dropDownRowCount ? _dataProvider.length : _dropDownRowCount);
+					callLater( highlightFirstItem );
+					callLater( positionDropDown );									
+				}	
+			}
+			
+			protected function highlightFirstItem():void
+			{
+				_dropDown.selectedIndex = 0;
+			}
+			
+			protected function isPerfectMatch():Boolean
+			{
+				if (!_searchText)
+				{
+					return false;
+				}
+				
+				var str:String = StringUtils.trimCommas( _searchText );
+				
+				if (_dataProvider && _dataProvider.length == 1)
+				{
+					var item:Object = _dataProvider.getItemAt( 0 );
+					
+					if (_autoSelectFunction != null)
+					{
+						if (_autoSelectFunction( item, str ))
+						{
+							_selectedItems.addItem( item );
+							dispatchEvent( new Event( Event.CHANGE ) );
+							return true;
+						}
+					}
+					else
+					{
+						var label:String = _labelFunction( item );
+						
+						if (label.toLowerCase() == str.toLowerCase())
+						{
+							_selectedItems.addItem( item );
+							dispatchEvent( new Event( Event.CHANGE ) );
+							return true;
+						}
+					}
+				}
+				
+				return false;
+			}
+						
+			[Bindable(event="searchChange")]
+			/**
+			 * Returns the search string.
+			 */						
+			public function get searchText():String
+			{
+				return textInput && textInput.text ? textInput.text : "";
+			}
+			
+			public function set searchText( value:String ):void
+			{
+				_searchText = value;
+				
+				textInput.text = value;
+				textInput.validateNow();
+				
+				var event:Event = new Event( SEARCH_CHANGE );
+				dispatchEvent( event );				
+			}
+			
+			public function filterData():void
+			{
+				_dataProvider.filterFunction = filterFunctionWrapper;
+				_dataProvider.refresh();
+			}
+			
+			public function showDropDown():void
+			{
+				if (isDropDownVisible())
+				{
+					return;
+				}
+				
+				if (_dropDown == null)
+				{
+					createDropDown();
+				}
+				
+				if (focusManager)
+				{
+					focusManager.defaultButtonEnabled = false;
+				}				
+				
+				_dropDown.width = _dropDownWidth ? _dropDownWidth : flowBox.width;
+				_dropDown.owner = this;
+				_dropDown.scrollToIndex(0);
+				
+				PopUpManager.addPopUp( _dropDown, this );
+
+				callLater( initDropDown );
+				callLater( callLater, [positionDropDown] );
+			}
+			
+			protected function initDropDown():void
+			{
+				_dropDown.selectedIndex = 0;
+				_dropDown.rowCount = (_dataProvider.length < _dropDownRowCount ? _dataProvider.length : _dropDownRowCount);							
+			}
+			
+			public function positionDropDown():void
+			{
+				if (!isDropDownVisible())
+				{
+					return;
+				}
+				
+				var localPoint:Point = new Point( 0, mainGridRow.y );
+				var globalPoint:Point = localToGlobal( localPoint );
+								
+				_dropDown.x = globalPoint.x;
+				
+				var fitsBelow:Boolean = Application.application.height - globalPoint.y - mainGridRow.height > dropDown.height;
+				var fitsAbove:Boolean = globalPoint.y > dropDown.height;
+				
+				// check if it will fit below the textInput 
+				if (fitsBelow || !fitsAbove)	
+				{
+					_dropDown.y = globalPoint.y + flowBox.measuredHeight;
+				}
+				else
+				{
+					_dropDown.y = globalPoint.y - dropDown.height;
+				}				
+			}
+			
+			public function hideDropDown():void
+			{
+				PopUpManager.removePopUp( _dropDown );
+				
+				callLater( enableDefaultButton );
+			}
+			
+			protected function enableDefaultButton():void
+			{
+				if (focusManager)
+				{
+					focusManager.defaultButtonEnabled = true;
+				}												
+			}
+			
+			public function get dropDown():List
+			{
+				return _dropDown;
+			}
+			
+			/**
+			 * The name of the field in the data provider items to display as the label.
+			 */
+			public function set labelField( value:String ):void
+			{
+				_labelField = value;
+			}
+			
+			/**
+			 * A user-supplied function to run on each item to determine its label.
+			 */
+			public function set labelFunction( value:Function ):void
+			{
+				_labelFunction = value;
+			}
+			
+			public function get labelFunction():Function
+			{
+				return _labelFunction;
+			}
+						
+			public function set dropDownLabelFunction( value:Function ):void
+			{
+				_dropDownLabelFunction = value;
+			}
+			
+			/**
+			 * This field is used in conjuction with the selectedItems or selectedItemId property to 
+			 * determine if the item matches.
+			 * @default id
+			 */
+			public function set keyField( value:String ):void
+			{
+				_keyField = value;
+			}
+			
+			/**
+			 * A function which controls whether or not to automatically select the item if it's the
+			 * only match. Note, this functionality is disabled if autoSelect is set to false. 
+			 */
+			public function set autoSelectFunction( value:Function ):void
+			{
+				_autoSelectFunction = value;
+			}
+			
+			[Inspectable(enumeration="true,false")]
+			/**
+			 * A flag which indicates whether or not we'll automatically select the value if
+			 * either (a) there's only one match and it's equal to the text or (b) matches
+			 * the custom autoSelectEnabled
+			 */
+			public function set autoSelectEnabled( value:Boolean ):void
+			{
+				_autoSelectEnabled = value;
+			}			
+			
+			/**
+			 * The custom item renderer for the dropdown displayed when searching.
+			 */			
+			public function set dropDownItemRenderer( value:IFactory ):void
+			{
+				_dropDownItemRenderer = value;
+			}
+			
+			/**
+			 * A function that the view will use to eliminate items that do not match the function's criteria.
+			 */ 			
+			public function set filterFunction( value:Function ):void
+			{
+				_filterFunction = value;
+			}
+			
+			[Inspectable(enumeration="true,false")]
+			/**
+			 * A flag that indicates whether or not you can select values which aren't in the dataProvider
+			 * @default true
+			 */			
+			public function set allowNewValues( value:Boolean ):void
+			{
+				_allowNewValues = value;
+			}
+			
+			[Inspectable(enumeration="false,true")]			
+			/**
+			 * Flag which sets whether or not we allow the user to 
+			 * select more than one item
+			 */
+			public function set allowMultipleSelection( value:Boolean ):void
+			{
+				if (value != _allowMultipleSelection)
+				{
+					 _allowMultipleSelection = value;
+					 _allowMultipleSelectionChanged = true;
+					 
+					 invalidateProperties();
+				}
+			}
+			
+			protected function filterFunctionWrapper( item:Object ):Boolean
+			{
+				return _filterFunction( item, _searchText );
+			}
+			
+			public function get textInput():PromptTextInput
+			{
+				return flowBox.textInput;
+			}
+			
+			public function set dataProvider( value:ListCollectionView ):void
+			{
+				if (value != _dataProvider)
+				{
+					if (_dataProvider != null)
+					{
+						_dataProvider.removeEventListener( CollectionEvent.COLLECTION_CHANGE, handleDataProviderChange );
+					}
+										
+					_dataProvider = value;
+					_dataProviderChanged = true;
+					
+					invalidateProperties();
+				}
+			}
+			
+			public function get dataProvider():ListCollectionView
+			{
+				return _dataProvider;
+			}
+			
+			/**
+			 * The id of the initially selected item.
+			 */
+			public function set selectedItemId( value:Number ):void
+			{
+				_selectedItemId = value;
+				_selectedItemIdChanged = true;
+
+				invalidateProperties();
+			}
+			
+			/**
+			 * An items in this list will be considered unavailable for selection. This
+			 * allows you to apply unqiue logic across multiple AutoCompletes
+			 */
+			public function set disabledItems( value:ArrayCollection ):void
+			{
+				_disabledItems = value;
+			}
+			
+			public function set dropDownWidth( value:int ):void
+			{
+				_dropDownWidth = value;
+			}
+			
+			/**
+			 * Checks if the component is in the process of resolving the selecteItemId to it's respective object.
+			 */
+			public function isSettingValue():Boolean
+			{
+				return _selectedItemId > 0;
+			}
+			
+			/**
+			 * An array of references to the selected items in the data provider.
+			 */
+			public function set selectedItems( value:ArrayCollection ):void
+			{
+				_initialSelectedItems = value;
+				_selectedItemsChanged = true;
+				
+				invalidateProperties();
+			}
+			
+			/**
+			 * A reference to the selected item in the data provider.
+			 */
+			public function set selectedItem( value:Object ):void
+			{
+				if (_selectedItem != value)
+				{
+					_selectedItem = value;
+					_selectedItemChanged = true;
+				
+					invalidateProperties();
+				}
+			}
+			
+			[Bindable(event="change")]
+			[Bindable(event="valueCommit")]
+			public function get selectedItems():ArrayCollection
+			{
+				return _selectedItems;
+			}
+			
+			[Bindable(event="change")]
+			[Bindable(event="valueCommit")]
+			public function get selectedItem():*
+			{
+				if (_selectedItems.length > 0)
+				{
+					return _selectedItems.getItemAt( _selectedItems.length - 1 );					
+				}
+				else
+				{
+					return null;
+				}
+			}
+			
+			[Bindable(event="change")]
+			[Bindable(event="valueCommit")]
+			public function get text():String
+			{
+				var str:String = "";
+				
+				for each (var item:Object in _selectedItems)
+				{
+					str += _labelFunction( item ) + ", ";
+				}
+				
+				str = str.substring( 0, str.length - 2);
+				
+				return str; 
+			}
+			
+			/**
+			 * The value of the text in the search field
+			 */			
+			public function set text( value:String ):void
+			{
+				if (value != _text)
+				{
+					_text = value;
+					_textChanged = true;
+				
+					invalidateProperties();
+				}
+			}
+			
+			public function isDropDownVisible():Boolean
+			{
+				return _dropDown && _dropDown.parent;
+			}
+			
+			/**
+			 * The prompt to display before the component receives focus
+			 */			
+			public function set prompt( value:String ):void
+			{
+				if (value != _prompt)
+				{
+					_prompt = value;
+					_promptChanged = true;
+				
+					invalidateProperties();
+				}
+			}
+			
+			public function set enableClearIcon( value:Boolean ):void
+			{
+				if (value != _enableClearIcon)
+				{
+					_enableClearIcon = value;
+					_enableClearIconChanged = true;
+				
+					invalidateProperties();
+				}
+			}
+			
+			[Inspectable(enumeration="true,false")]
+			/**
+			 * A flag that indicates whether or not to display the remove icon in the selected items.
+			 * @default false
+			 */			
+			public function set showRemoveIcon( value:Boolean ):void
+			{
+				if (value != _showRemoveIcon)
+				{
+					_showRemoveIcon = value;
+					_showRemoveIconChanged = true;
+				
+					invalidateProperties();
+				}
+			}
+			
+			[Inspectable(enumeration="beginning,word,anyPart")]
+			/**
+			 * Specifies the how to compare the item to the search string when checking for a match.
+			 * Note, setting a value for the filterFunction property will override this property.
+			 * @default beginning
+			 */
+			public function set matchType( value:String ):void
+			{
+				_matchType = value;
+			}
+			
+			public function get matchType():String
+			{
+				return _matchType;
+			}
+						
+			override public function setFocus():void
+			{
+				textInput.setFocus();
+			}
+			
+			override public function drawFocus( isFocused:Boolean ):void
+			{
+				flowBox.drawFocus( isFocused );
+			}
+			
+			override public function styleChanged( styleProp:String ):void
+			{
+				super.styleChanged( styleProp );
+				
+				if ( styleProp == "borderColor" )
+				{
+					flowBox.setStyle( styleProp, getStyle( styleProp ) );
+				}
+			}			
+			
+			override public function set errorString( value:String ):void
+			{
+				_errorStr = value;
+				_errorStrChanged = true;
+				
+				invalidateProperties();
+			}
+			
+			override public function get errorString():String
+			{
+				return flowBox ? flowBox.errorString : null;
+			}
+			
+			[Inspectable(enumeration="focus,remove")]
+			/**
+			 * The action to take when pressing backspace when the cursor is in front of a selected item.
+			 * @default focus 
+			 */			
+			public function set backspaceAction( value:String ):void
+			{
+				_backspaceAction = value;
+			}
+			
+			[Inspectable(enumeration="true,false")]
+			/**
+			 * A flag that indicates whether or not you can select duplicate items when multiselect mode is enabled
+			 * @default false
+			 */			
+			public function set allowDuplicates( value:Boolean ):void
+			{
+				_allowDuplicates = value;
+			}
+			
+			[Inspectable(enumeration="true,false")]
+			/**
+			 * A flag that indicates whether or not you can edit a new item which has been added. This only affects
+			 * the component when allowNewValues is set to false
+			 */			
+			public function set allowEditingNewValues( value:Boolean ):void
+			{
+				_allowEditingNewValues = value;
+			}
+			
+			[Inspectable(enumeration="true,false")]
+			/**
+			 * A flag that indicates whether or not you can edit an item after it's been selected.
+			 */			
+			public function set allowEditingSelectedValues( value:Boolean ):void
+			{
+				_allowEditingSelectedValues = value;
+			}
+			
+			public function set inlineButton( value:Button ):void
+			{
+				if (_inlineButton != value)
+				{
+					_inlineButton = value;
+					_inlineButtonChanged = true;
+					
+					invalidateProperties();
+				}
+			}
+			
+			public function get inlineButton():Button
+			{
+				return _inlineButton;
+			}
+			
+			public function isItemSelected( item:Object ):Boolean
+			{
+				return _selectedItems.getItemIndex( item ) >= 0;
+			}
+			
+			/**
+			 * The number of rows to show in the dropDown which
+			 * appears when searching
+			 */
+			public function set dropDownRowCount( value:uint ):void
+			{
+				_dropDownRowCount = value;
+			}
+
+			override public function set maxHeight( value:Number ):void
+			{
+				_maxHeight = value;
+				_maxHeightChanged = true;
+				
+				invalidateProperties();
+			}
+
+			override public function set tabIndex(value:int):void
+			{
+				_tabIndex = value;
+				_tabIndexChanged = true;
+				
+				invalidateProperties();
+			}
+			
+			override public function get tabIndex():int
+			{
+				return flowBox.textInput.textInput.tabIndex;
+			}
+			
+			/**
+			 * The value used to separate items when allowMultipleSelection
+			 * is enabled. The values can also be used to select an item. The
+			 * default value is ","
+			 */
+			public function set delimiter( value:String ):void
+			{
+				_delimiter = value;
+			}
+			
+			[Inspectable(enumeration="true,false")]
+			/**
+			 * This controls whether or not the component will clear the
+			 * search term when the component loses focus (when allowNewValues
+			 * is set to false). The default value is true.
+			 */
+			public function set clearSearchOnFocusOut( value:Boolean ):void
+			{
+				_clearSearchOnFocusOut = value;
+			}
+				
+
+		]]>
+	</mx:Script>
+	
+	<mx:GridRow id="mainGridRow" width="100%" height="100%">
+		<mx:GridItem id="mainGridItem" width="100%" height="100%">
+			<classes:FlowBox id="flowBox" width="100%" height="100%" 
+				change="handleFlowBoxChange(event)" resize="handleFlowBoxResize()"/>
+		</mx:GridItem>
+	</mx:GridRow>
+	
+</mx:Grid>

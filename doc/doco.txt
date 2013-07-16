@@ -1,0 +1,230 @@
+The best way to learn how to use the component is to use the Demo to see what options are available and then reference the source code in the examples folder to understand how it's implemented. It's also a good idea to skim through the methods and properties in the ASDoc file (as the demo doesn't use every property/method available). Here are the two files: <a href="http://web.me.com/hillelcoren/Site/AutoComplete.html" target="_blank">AutoComplete</a> and <a href="http://web.me.com/hillelcoren/Site/AdvancedAutoComplete.html" target="_blank">AdvancedAutoComplete</a>.
+
+Although the component doesn't extend from the ComboBox class, it's designed to have as similar an interface as possible. For example, it implements the filterFunction, labelFunction and selectedItems properties as well as others.
+
+Here's the simplest possible implementation of the component.
+
+[sourcecode language='jscript']
+<?xml version="1.0" encoding="utf-8"?>
+<mx:Application 
+	xmlns:mx="http://www.adobe.com/2006/mxml" 
+	xmlns:components="com.hillelcoren.components.*">
+	
+	<mx:Script>
+		<![CDATA[
+			import mx.collections.ArrayCollection;
+			
+			[Bindable]
+			private var _data:ArrayCollection = new ArrayCollection( ["one", "two", "three"] );
+			
+		]]>
+	</mx:Script>
+	
+	<components:AutoComplete dataProvider="{ _data }" />
+	
+</mx:Application>
+[/sourcecode]
+
+While there are a fair number of settings you can adjust, I'd like to start by the showing the way I generally use the component.
+
+[sourcecode language='jscript']
+<components:AutoComplete dataProvider="{ _data }" 
+	prompt="Please select" backspaceAction="remove" 
+	selectedItemStyleName="underline"/>
+[/sourcecode]
+
+I've set three properties which I'll review quickly here.
+<ul>
+<li><code>selectedItemStyleName</code>: Controls the look of the selected items. There are four choices: macMail, facebook, underline and none.</li>
+<li><code>prompt</code>: A string to display when no value is set.</li>
+<li><code>backSpaceAction</code>: Determines what to do when a user clicks backspace. By default we focus the item (ala Mac Mail) but this can be changed to remove it.</li>
+</ul>
+
+<h3>Working with the data</h3>
+
+Like most other Flex components you can set either the <code>labelField</code> or <code>labelFunction</code> property. By default this will control how the item is displayed through out the component (in the drop down, once selected and in the browsers). 
+
+You have a couple of choices for customizing the drop down label. You can define a <code>dropDownLabelFunction</code> which returns an HTML string to handle formatting the item. This is used in the email demo to display the person's email address (ie, "Homer Simpson &lt;homer@gmail.com&gt;") in the drop down. If you'd like greater control you can set a <code>dropDownItemRenderer</code>. This can be seen in the Color Chooser demo.
+
+If multiple selection is enabled the component can contain both selected items and a search string. Because of this I've need to add a <code>searchText</code> property which can be used to get/set the search string. The <code>text</code> property returns a string representation of the selected items. Here's a simple <a href="http://web.me.com/hillelcoren/Site/searchText.html" target="_blank">demo</a> which demonstrates the difference between the two properties.
+
+Related to this there are two main events which the component dispatches: <code>change</code> and <code>searchChange</code>. The <code>change</code> event is dispatched when the selectedItem property changes, while the <code>searchChange</code> event is dispatched when the search string is changed.
+
+To filter the data you can either use the built in options by setting the "matchType" property or create a custom filter by setting a value for the "filterFunction" property. The built in options are:
+
+<ul>
+<li><code>beginning</code>: Only match the beginning of the string.</li>
+<li><code>word</code>: Match the beginning of any of the words in the string.</li>
+<li><code>anyPart</code>: Matches any part of the string.</li>
+</ul>
+
+All of the built in options perform a case-insensitive search. Here's how you could use the filterFunction property to implement a case-sensisitve search.
+
+[sourcecode language='jscript']
+<mx:Script>
+	<![CDATA[
+		import com.hillelcoren.utils.StringUtils;
+		import mx.collections.ArrayCollection;
+			
+		[Bindable]
+		private var _data:ArrayCollection = new ArrayCollection( ["ONE", "TWO", "THREE"] );
+			
+		private function filterFunction( item:String, searchStr:String ):Boolean
+		{
+			return searchStr == item.substr( 0, searchStr.length );
+		}
+			
+	]]>
+</mx:Script>
+	
+<components:AutoComplete dataProvider="{ _data }" filterFunction="filterFunction"/>
+[/sourcecode]
+
+To select items you have three options, you can use either selectedItem, selectedItems or selectedItemId. The first two options are pretty standard so I won't cover them here. Setting the selectedItemId property will cause the component to search the items in the dataProvider for an object with a matching id. By defualt, it looks for a field called "id" on the item but you can set a custom field using the <code>keyField</code> property.
+
+Out of the box the component requires the user to select an item from the list. You can allow the user to enter their own values by setting <code>allowNewValues</code> to true. You can then control whether or new the new items are editable by setting the <code>allowEditingNewValues</code> property. Additionally, you can set the <code>allowDuplicates</code> property to control whether or not to allow an item to be selected more than once.
+
+A common question is how to use the component with data returned from the server. The best practice is to use a change listener. Once the user has entered enough characters fire off your data request. Once the data has been returned and passed to the dataProvider you can call the <code>search()</code> method to tell the component to filter the items and display the drop down. You can check out the DynamicData.mxml file in the examples folder to see the details.
+
+You can use either an ArrayCollection or an XMLListCollection as the dataProvider. I showed you an example with an ArrayCollection earlier on, here's an example using an XMLListCollection.
+
+[sourcecode language='jscript']
+<mx:XML format="e4x" id="xml">  
+	<items>  
+		<item>one</item>  
+		<item>two</item>
+		<item>three</item>  
+	</items>  
+</mx:XML>  
+	   
+<mx:XMLListCollection id="xmlList" source="{ xml.item }"/>   	
+<components:AutoComplete dataProvider="{ xmlList }"/>
+[/sourcecode]
+
+<h3>Usability settings</h3>
+
+<h4>Multiple Selection</h4>
+
+This is the one feature which separates the component from other the AutoCompletes out there, setting the <code>allowMultipleSelection</code> to true enables the user to select more than one value. The AdvancedAutoComplete extends this feature by adding a <code>selectionLayout</code> property which when set to vertical causes the selected items to be displayed in a List component.
+
+<h4>AutoSelect</h4>
+
+The AutoSelect functionality will automatically select an item if it matches a case-insensitive string comparison and is the only match found. This feature can be disabled by setting autoSelectEnabled to false. 
+
+If you'd like to use a custom function to determine if an item should be auto-selected you can set a value for the autoSelectFunction property. Here's an example where we use this property to auto-select once when there is a single match. For example, typing "o" will select "one" right away.
+
+[sourcecode language='jscript']
+<mx:Script>
+	<![CDATA[
+		import mx.collections.ArrayCollection;
+			
+		[Bindable]
+		private var _data:ArrayCollection = new ArrayCollection( ["one", "two", "three"] );
+			
+		private function selectFunction( item:String, searchStr:String ):Boolean
+		{
+			return true;
+		}
+			
+	]]>
+</mx:Script>
+	
+<components:AutoComplete dataProvider="{ _data }" autoSelectFunction="selectFunction" />
+[/sourcecode]
+
+<h4>Clear Icon</h4>
+
+The core of the component is the PromptTextInput class. This class provides two main features: the prompt and the clear icon. We covered the prompt earlier but the clear icon is a little gray x icon which appears if there is text in the component. Note, this feature only works if <code>allowMultipleSelection</code> is set to false.
+
+<h4>Drop Down</h4>
+
+The number of items displayed in the drop down is controlled by the <code>dropDownRowCount</code> property. By defualt, the width of the drop down will 
+be set to match the width of the TextInput. However this can be overriden using the <code>dropDownWidth</code> property. On the topic of the drop down, you can use the showDropDown, hideDropDown and isDropDown visible to show/hide the drop down. 
+
+<h3>AdvancedAutoComplete</h3>
+
+The challenge in building a component with lots of features is keeping it as streamlined as possible. In order to support adding more advanced functionality while not bloating the component I've created an AdvancedAutoComplete class which extends the AutoComplete component. 
+
+<h4>Selection Layout</h4>
+
+As discussed earlier, setting the <code>selectionLayout</code> to vertical causes the items to be displayed in a List. When using the vertical layout you can use the <code>showRemoveButton</code> property to control whether or not to show a remove button.
+
+<h4>Browsing</h4>
+
+This can be enabled by either setting the <code>showBrowseButton</code> property to true, or by adding an options to the action menu (as is demonstrated in the Color Chooser Demo). By default we show a pop window which contains a searchable DataGrid. You can control which fields of the data to display in the grid using the <code>browserFields</code> property. If multiple selection is enabled, you can set the <code>useListBuilder</code> property to true to display a two column browser instead. If you'd like to implement your own browser you can either extends one the existing ones are create a component which implements the IBrowser interface. You'll then need to set the <code>browserClass</code> property to your new class.
+
+<h4>Ordering</h4>
+
+If the <code>selectionLayout</code> is set to vertical you can enable the user to order the items in the list by setting the <code>showOrderButtons</code> property to true. If using the List Builder the ordering buttons will also be displayed in it.
+
+<h4>Actions Menu</h4>
+
+To enable the action menu you need to set a value for the <code>actionsMenuDataProvider</code>. This is just a regular Flex Menu component so all the usual features are supported (ie, using checkboxes). Here's a <a href="http://livedocs.adobe.com/flex/3/html/help.html?content=menucontrols_3.html" target="_blank">link</a> to the supported menu attributes. You can see an example of how to use this feature in the code for the AdvancedDemo. If enabled the menu can be displayed by pressing the down button while the component has focus.
+
+<h3>Odds and Ends</h3>
+
+<h4>Custom Skins</h4>
+
+The selected items are simply buttons, this means it's pretty easy to change the look and feel using skins. The styles which the component comes with (macMail, facebook, etc) are all implement using skins. It's possible to define your own custom skin. If you'd like to implement it you can check out the CustomSkin.mxml file in the examples folder.
+
+<h4>First Class Components</h4>
+
+The component is made up of a number of classes. Some of these classes are useful in their own right. I consider the following three classes to be first class components:
+<ul>
+<li><b>PromptTextInput:</b> This is a TextInput with two additional features, you can set a prompt which will appear when no value is set and a clear icon will appear when there is a value set and the mouse is over the component.</li>
+<li><b>ListBuilder:</b> This is a two column browser which can be used to add/remove items from a list.</li>
+<li><b>CloseableTitleWindow:</b> Adds a key listener to the TitleWindow which enables the user to click the ESC key to close it.</li>
+</ul>
+
+<h4>Utility Classes</h4>
+
+The com/hillelcoren/utils folder contains a couple of helper classes. There are some useful functions here which you may be able to use elsewhere in your applications. Some examples include a function to compare if two ArrayCollections are equal and functions to convert string to/from camel caps.
+
+<h4>Validating</h4>
+
+You can use a regular validator to make sure that a value is selected. Here's a simple example demonstrating how to implement it.
+
+[sourcecode language='jscript']
+<mx:Validator source="{ autoComplete }" property="selectedItem"/> 
+<components:AutoComplete id="autoComplete" dataProvider="{ _data }"/>
+[/sourcecode]
+
+<h4>Inline Button</h4>
+
+You can use the <code>inlineButton</code> property to set a button to appear at the end of the component. This feature is used in the AdvancedAutoComplete for the button used to display the actions menu. Here's an example of how you can use this property to display a button which causes the drop down to appear (ala a regular ComboBox)
+
+[sourcecode language='jscript']
+<mx:Script>
+	<![CDATA[
+		import mx.collections.ArrayCollection;
+
+		[Bindable]
+		private var _data:ArrayCollection = new ArrayCollection( ["one","two","three"] );
+
+		private function handleButtonClick():void
+		{
+			if (autoComplete.isDropDownVisible())
+			{
+				autoComplete.hideDropDown();
+			}
+			else
+			{
+				autoComplete.search();
+				autoComplete.showDropDown();
+			}
+		}
+
+	]]>
+</mx:Script>
+
+<components:AdvancedAutoComplete id="autoComplete" dataProvider="{ _data }">
+	<components:inlineButton>
+		<mx:Button icon="@Embed(source='/com/hillelcoren/assets/icons/down.png')" click="handleButtonClick()"/>
+	</components:inlineButton>
+</components:AdvancedAutoComplete>
+[/sourcecode]
+
+That about does it, hopefully you found this useful. I plan to continue to improve the documentation over time. If anything here is unclear, or if there are other areas you'd like me to cover please post a comment and I'll update the page.
+
+Best,
+Hillel

@@ -1,0 +1,207 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:HBox
+	xmlns:mx="http://www.adobe.com/2006/mxml"
+	xmlns:classes="com.hillelcoren.components.autoComplete.classes.*"
+	implements="mx.managers.IFocusManagerComponent,com.hillelcoren.components.autoComplete.interfaces.iComboItem"
+	verticalGap="0" horizontalGap="0" tabChildren="false" tabEnabled="false" 
+	height="{ textInput.height }" initialize="init()"
+	verticalScrollPolicy="off" horizontalScrollPolicy="off"
+	creationComplete="init()">
+	
+	<mx:Metadata>
+		[Event(name="change")]
+		[Event(name="removeItem")]
+		[Style(name="selectedItemStyleName", type="String", inherit="yes")]
+	</mx:Metadata>
+	
+	<mx:Script>
+		<![CDATA[
+			import mx.utils.StringUtil;
+			import com.hillelcoren.utils.StringUtils;
+			import mx.core.UITextField;
+			import com.hillelcoren.components.AutoComplete;
+			import mx.events.FlexEvent;
+			import mx.controls.Label;
+			import mx.core.UIComponent;
+			import mx.controls.TextInput;
+			
+			protected var _text:String;
+			protected var _textChanged:Boolean;
+			
+			protected var _buttonStyleChanged:Boolean;
+			
+			protected var _item:Object;
+			protected var _isMouseOver:Boolean;
+			
+			protected var _allowMultipleSelection:Boolean;
+			protected var _allowMultipleSelectionChanged:Boolean;
+			
+			[Bindable]			
+			protected var _showRemoveIcon:Boolean = true;
+			
+			public static const REMOVE_ITEM:String = "removeItem";
+			
+			protected function init():void
+			{
+				button.addEventListener( FocusEvent.FOCUS_OUT, handleButtonFocusOut );
+			}
+			
+			override protected function commitProperties():void
+			{
+				super.commitProperties();
+				
+				if (_textChanged)
+				{
+					_textChanged = false;					
+					button.label = _text;
+				}
+				
+				if (_allowMultipleSelectionChanged)
+				{
+					_allowMultipleSelectionChanged = false;
+					button.allowMultipleSelection = _allowMultipleSelection;
+				}
+			}
+			
+			override public function styleChanged( styleProp:String ):void
+			{
+				super.styleChanged( styleProp );
+				
+				if (!styleProp || styleProp == "selectedItemStyleName")
+				{
+					_buttonStyleChanged = true;					
+					invalidateDisplayList();
+				}
+			}
+					
+			override protected function updateDisplayList( unscaledWidth:Number, unscaledHeight:Number ):void
+			{
+				super.updateDisplayList( unscaledWidth, unscaledHeight );
+				
+				if (_buttonStyleChanged)
+				{
+					_buttonStyleChanged = false;
+					
+					var styleName:String = getStyle( "selectedItemStyleName" );
+					button.setStyle( "styleName", styleName );
+				}
+			}
+			
+			protected function handleClick():void
+			{
+				selected = true;
+			}
+									
+			protected function handleButtonFocusOut( event:FocusEvent ):void
+			{
+				if (!event.relatedObject)
+				{
+					button.setFocus();					
+				}
+				else
+				{
+					selected = false;
+				}
+			}
+			
+			protected function handleTextInput( event:TextEvent ):void
+			{
+				textInput.text = "";
+				textInput.validateNow();
+				
+				dispatchEvent( event );
+			}
+			
+			public function set item( value:Object ):void
+			{
+				_item = value;				
+			}
+			
+			public function get item():Object
+			{
+				return _item;
+			}
+			
+			public function get newText():String
+			{
+				return textInput.text;
+			}
+			
+			public function setTextFocus():void
+			{
+				textInput.setFocus();
+			}
+			
+			override public function setFocus():void
+			{
+				button.setFocus();
+			}
+			
+			public function set selected( value:Boolean ):void
+			{
+				button.selected = value;
+			}
+			
+			public function isCursorAtBeginning():Boolean
+			{
+				return true;
+			}
+			
+			public function isCursorAtEnd():Boolean
+			{
+				return true;
+			}
+			
+			public function isEditable():Boolean
+			{
+				return false;
+			}			
+			
+			public function set text( value:String ):void
+			{
+				if (_text != value)
+				{
+					_text = value;
+					_textChanged = true;
+				
+					invalidateProperties();
+				}
+			}
+			
+			public function get text():String
+			{
+				return _text;
+			}
+					
+			public function set showRemoveIcon( value:Boolean ):void
+			{
+				_showRemoveIcon = value;
+			}
+			
+			public function handleRemoveClick():void
+			{
+				var event:Event = new Event( REMOVE_ITEM );
+				dispatchEvent( event );
+			}
+
+			public function set allowMultipleSelection( value:Boolean ):void
+			{
+				if (_allowMultipleSelection != value)
+				{
+					_allowMultipleSelection = value;
+					_allowMultipleSelectionChanged = true;
+					
+					invalidateProperties();
+				}
+			}
+						
+		]]>
+	</mx:Script>
+	
+	<classes:ShorterTextInput id="textInput" width="5" borderStyle="none" borderSkin="{null}" paddingLeft="0" paddingRight="0" 
+		focusThickness="0" textInput="handleTextInput(event)"/>
+	<classes:IconButton id="button" showRemoveIcon="{ _showRemoveIcon }" 
+		click="handleClick()" removeClick="handleRemoveClick()" toggle="true"/>
+	<mx:Spacer id="spacer"/>
+	
+</mx:HBox>

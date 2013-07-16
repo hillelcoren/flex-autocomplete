@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:Label xmlns:mx="http://www.adobe.com/2006/mxml" 
+	width="100%" toolTip=""
+	creationComplete="init()"
+	htmlText="{ _list.labelFunction( data ) }">
+	
+	<mx:Script>
+		<![CDATA[
+			import mx.controls.List;
+			
+			[Bindable]
+			protected var _list:List;
+			
+			protected function init():void
+			{
+				if (listData)
+				{
+					_list = listData.owner as List;
+				}
+			}
+		]]>
+	</mx:Script>
+	
+</mx:Label>

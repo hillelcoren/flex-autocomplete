@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:Application
+	xmlns:mx="http://www.adobe.com/2006/mxml"
+	xmlns:hc="com.hillelcoren.components.*"
+	xmlns:classes="com.hillelcoren.components.autoComplete.classes.*"
+	width="100%" height="100%"
+	verticalAlign="middle" horizontalAlign="center"
+	color="#000000" xmlns:local="*"
+	initialize="init()" viewSourceURL="srcview/index.html">
+	
+	<mx:Script>
+		<![CDATA[
+			
+			// There's an issue with the TabNavigator where sometimes the background goes white 
+			// http://www.typeoneerror.com/background-disappearing-with-tabnavigator-in-flex/
+			private function handleMouseDown():void 
+			{
+				alpha = 0.99; 
+				alpha = 1.0;
+			}
+
+		]]>
+	</mx:Script>
+	
+	<mx:TabNavigator width="530" height="320" focusEnabled="false" mouseDown="{ handleMouseDown() }">
+		<local:ColorDemo label="AutoComplete"/>
+		<local:DataGridDemo label="DataGrid Demo"/>
+		<local:EmailDemo label="Email Demo"/>			
+		<local:AdvancedDemo label="Advanced AutoComplete"/>
+	</mx:TabNavigator>
+		
+</mx:Application>
