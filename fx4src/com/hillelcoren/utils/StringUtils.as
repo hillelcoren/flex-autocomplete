@@ -1,8 +1,6 @@
 package com.hillelcoren.utils
 {
-	import com.hillelcoren.components.AutoComplete;
-	
-	import mx.utils.StringUtil;
+    import mx.utils.StringUtil;
 	
 	public class StringUtils
 	{
@@ -24,7 +22,7 @@ package com.hillelcoren.utils
 		
 		public static function contains( string:String, searchStr:String ):Boolean
 		{
-			var regExp:RegExp = new RegExp( searchStr, "i" );
+			var regExp:RegExp = new RegExp( regexEscape( searchStr ), "i" );
 			
 			return regExp.test( string );			
 		}
@@ -202,11 +200,26 @@ package com.hillelcoren.utils
 		public static function highlightMatch( string:String, searchStr:String ):String
 		{
 			// solution by Jan Reges, 2009-07-17
-			var searchStrPattern:String = "(" + searchStr + ")";
+			var searchStrPattern:String = "(" + regexEscape( searchStr ) + ")";
 			var regExp:RegExp = new RegExp( searchStrPattern, "igm" );
 			var returnStr:String = string.replace( regExp, "<b><u>$1</u></b>" );
 
 			return returnStr;
-		}		
+        }
+
+        /**
+         * Escape special characters in the input string so that the output
+         * string, when used as part of a regular expression, will match
+         * the input string only.
+         */
+        public static function regexEscape( string:String ):String
+        {
+            if (!string)
+            {
+                return string;
+            }
+
+            return string.replace(/[.*+?|(){}\[\]\\^$]/g, "\\$&");
+        }
 	}
 }
