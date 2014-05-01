@@ -39,49 +39,36 @@
 		
 	<mx:Script>
 		<![CDATA[
-			import com.hillelcoren.components.AutoComplete;
-			import com.hillelcoren.components.PromptTextInput;
 			import com.hillelcoren.components.autoComplete.classes.DropDownItemRenderer;
 			import com.hillelcoren.components.autoComplete.classes.EditableItem;
 			import com.hillelcoren.components.autoComplete.classes.IconButton;
 			import com.hillelcoren.components.autoComplete.classes.SelectedItem;
 			import com.hillelcoren.components.autoComplete.interfaces.iComboItem;
-			import com.hillelcoren.utils.KeyboardUtil;
 			import com.hillelcoren.utils.StringUtils;
 			
 			import mx.collections.ArrayCollection;
-			import mx.collections.ListCollectionView;
+            import mx.collections.IList;
+            import mx.collections.ListCollectionView;
 			import mx.controls.Button;
 			import mx.controls.List;
-			import mx.controls.Text;
-			import mx.controls.TextArea;
-			import mx.controls.TextInput;
 			import mx.controls.dataGridClasses.DataGridListData;
 			import mx.controls.listClasses.BaseListData;
 			import mx.core.Application;
 			import mx.core.UIComponent;
-			import mx.core.UITextField;
-			import mx.effects.easing.Back;
 			import mx.events.CollectionEvent;
 			import mx.events.CollectionEventKind;
 			import mx.events.FlexEvent;
-			import mx.events.FlexMouseEvent;
 			import mx.events.ListEvent;
-			import mx.events.MenuEvent;
 			import mx.events.MoveEvent;
-			import mx.events.ResizeEvent;
-			import mx.events.ScrollEvent;
-			import mx.managers.CursorManager;
-			import mx.managers.FocusManager;
 			import mx.managers.PopUpManager;
-			import mx.utils.ObjectUtil;
-			import mx.utils.StringUtil;
 			
 			protected var _dropDown:List;
 			protected var _matchType:String = MATCH_WORD;
-			
-			[Bindable]
-			protected var _dataProvider:ListCollectionView;
+
+            // The dataProvider supplied by the user is stored in
+            // the .list property of the _filteredDataProvider
+            [Bindable]
+            protected var _filteredDataProvider:ListCollectionView;
 			protected var _dataProviderChanged:Boolean;
 			
 			protected var _searchText:String;
@@ -311,20 +298,20 @@
 					flowBox.maxHeight = _maxHeight;
 				}				
 				
-				if (_dataProviderChanged && _dataProvider)
+				if (_dataProviderChanged && _filteredDataProvider)
 				{
 					_dataProviderChanged = false;
 					
-					_dataProvider.addEventListener( CollectionEvent.COLLECTION_CHANGE, handleDataProviderChange, false, 0, true );
-					_dataProvider.refresh();
+                    _filteredDataProvider.addEventListener( CollectionEvent.COLLECTION_CHANGE, handleDataProviderChange, false, 0, true );
+                    _filteredDataProvider.refresh();
 					
 					if (_dropDown)
 					{
-						_dropDown.dataProvider = _dataProvider;
+						_dropDown.dataProvider = _filteredDataProvider;
 					}					
 				}	
 
-				if (_selectedItemChanged && _dataProvider)
+				if (_selectedItemChanged && _filteredDataProvider)
 				{
 					_selectedItemChanged = false;
 					clear();
@@ -337,14 +324,14 @@
 					_selectedItem = null;
 				}
 				
-				if (_selectedItemIdChanged && _dataProvider)
+				if (_selectedItemIdChanged && _filteredDataProvider)
 				{
 					_selectedItemIdChanged = false;
 					_selectedItems.removeAll();
 					
-					for (i=0; i<_dataProvider.list.length; i++)
+					for (i=0; i<_filteredDataProvider.list.length; i++)
 					{
-						item = _dataProvider.list.getItemAt(i);
+						item = _filteredDataProvider.list.getItemAt(i);
 						
 						if (item.hasOwnProperty( _keyField ) && item[ _keyField ] == _selectedItemId)
 						{
@@ -355,7 +342,7 @@
 					}
 				}
 								
-				if (_selectedItemsChanged && _dataProvider)
+				if (_selectedItemsChanged && _filteredDataProvider)
 				{
 					_selectedItemsChanged = false;
 					_selectedItems.removeAll();
@@ -364,9 +351,9 @@
 					{
 						var foundItem:Object = null;
 						
-						for (i=0; i<_dataProvider.list.length; i++)
+						for (i=0; i<_filteredDataProvider.list.length; i++)
 						{
-							item = _dataProvider.list.getItemAt(i);
+							item = _filteredDataProvider.list.getItemAt(i);
 							
 							if (item == selectedItem)
 							{
@@ -668,7 +655,7 @@
 			{
 				_dropDown = new List();
 				_dropDown.focusEnabled 	= false;
-				_dropDown.dataProvider 	= _dataProvider;
+				_dropDown.dataProvider 	= _filteredDataProvider;
 				_dropDown.labelFunction = _dropDownLabelFunction;
 				_dropDown.rowCount		= _dropDownRowCount;
 				_dropDown.itemRenderer  = _dropDownItemRenderer ? _dropDownItemRenderer : new ClassFactory( DropDownItemRenderer );
@@ -702,7 +689,7 @@
 				{
 					if (event.keyCode == Keyboard.DOWN)
 					{
-						if (_dropDown.selectedIndex == _dataProvider.length - 1)
+						if (_dropDown.selectedIndex == _filteredDataProvider.length - 1)
 						{
 							_dropDown.selectedIndex = 0;
 						}
@@ -718,7 +705,7 @@
 					{
 						if (_dropDown.selectedIndex == 0)
 						{
-							_dropDown.selectedIndex = _dataProvider.length - 1;
+							_dropDown.selectedIndex = _filteredDataProvider.length - 1;
 						}
 						else
 						{
@@ -1003,7 +990,7 @@
 					selectedItems.removeItemAt( 0 );				
 				}
 				
-				var isNew:Boolean = item is String && (!_dataProvider || _dataProvider.getItemIndex( item ) == -1);
+				var isNew:Boolean = item is String && (!_filteredDataProvider || _filteredDataProvider.getItemIndex( item ) == -1);
 				
 				if (isNew)
 				{
@@ -1114,7 +1101,7 @@
 					dispatchEvent( event );
 				}
 				
-				if (!_dataProvider)
+				if (!_filteredDataProvider)
 				{
 					return;
 				}				
@@ -1157,7 +1144,7 @@
 					textInput.text = _searchText;
 				}
 				
-				if (_dataProvider.length == 0)
+				if (_filteredDataProvider.length == 0)
 				{
 					hideDropDown();
 					return;
@@ -1172,7 +1159,7 @@
 				}
 				else
 				{
-					if (_searchText && _searchText.length > 0 && _dataProvider.length > 0)
+					if (_searchText && _searchText.length > 0 && _filteredDataProvider.length > 0)
 					{
 						showDropDown();	
 					}
@@ -1180,7 +1167,7 @@
 				
 				if (isDropDownVisible())
 				{
-					_dropDown.rowCount = (_dataProvider.length < _dropDownRowCount ? _dataProvider.length : _dropDownRowCount);
+					_dropDown.rowCount = (_filteredDataProvider.length < _dropDownRowCount ? _filteredDataProvider.length : _dropDownRowCount);
 					callLater( highlightFirstItem );
 					callLater( positionDropDown );									
 				}	
@@ -1200,9 +1187,9 @@
 				
 				var str:String = StringUtils.trimCommas( _searchText );
 				
-				if (_dataProvider && _dataProvider.length == 1)
+				if (_filteredDataProvider && _filteredDataProvider.length == 1)
 				{
-					var item:Object = _dataProvider.getItemAt( 0 );
+					var item:Object = _filteredDataProvider.getItemAt( 0 );
 					
 					if (_autoSelectFunction != null)
 					{
@@ -1251,8 +1238,8 @@
 			
 			public function filterData():void
 			{
-				_dataProvider.filterFunction = filterFunctionWrapper;
-				_dataProvider.refresh();
+				_filteredDataProvider.filterFunction = filterFunctionWrapper;
+                _filteredDataProvider.refresh();
 			}
 			
 			public function showDropDown():void
@@ -1285,7 +1272,7 @@
 			protected function initDropDown():void
 			{
 				_dropDown.selectedIndex = 0;
-				_dropDown.rowCount = (_dataProvider.length < _dropDownRowCount ? _dataProvider.length : _dropDownRowCount);							
+				_dropDown.rowCount = (_filteredDataProvider.length < _dropDownRowCount ? _filteredDataProvider.length : _dropDownRowCount);							
 			}
 			
 			public function positionDropDown():void
@@ -1442,25 +1429,25 @@
 				return flowBox.textInput;
 			}
 			
-			public function set dataProvider( value:ListCollectionView ):void
+			public function set dataProvider( value:IList ):void
 			{
-				if (value != _dataProvider)
+				if (value != dataProvider)
 				{
-					if (_dataProvider != null)
+					if (_filteredDataProvider != null)
 					{
-						_dataProvider.removeEventListener( CollectionEvent.COLLECTION_CHANGE, handleDataProviderChange );
+                        _filteredDataProvider.removeEventListener( CollectionEvent.COLLECTION_CHANGE, handleDataProviderChange );
 					}
-										
-					_dataProvider = value;
+
+                    _filteredDataProvider = value == null ? null : new ListCollectionView(value);
 					_dataProviderChanged = true;
 					
 					invalidateProperties();
 				}
 			}
 			
-			public function get dataProvider():ListCollectionView
+			public function get dataProvider():IList
 			{
-				return _dataProvider;
+				return _filteredDataProvider == null ? null : _filteredDataProvider.list;
 			}
 			
 			/**
