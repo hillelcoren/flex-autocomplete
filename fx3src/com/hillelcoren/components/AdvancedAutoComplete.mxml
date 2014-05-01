@@ -21,21 +21,13 @@
 			import com.hillelcoren.components.autoComplete.classes.*;
 			import com.hillelcoren.components.autoComplete.interfaces.IBrowser;
 			
-			import mx.collections.ArrayCollection;
 			import mx.collections.ListCollectionView;
 			import mx.containers.GridItem;
-			import mx.containers.GridRow;
-			import mx.containers.HBox;
-			import mx.containers.VBox;
 			import mx.controls.Button;
-			import mx.controls.LinkButton;
-			import mx.core.Application;
 			import mx.core.EdgeMetrics;
 			import mx.core.IFlexDisplayObject;
-			import mx.core.UIComponent;
 			import mx.events.MenuEvent;
 			import mx.events.MoveEvent;
-			import mx.events.ResizeEvent;
 			import mx.managers.PopUpManager;
 			
 			protected var _showBrowseButton:Boolean;
@@ -240,7 +232,7 @@
 			
 			public function showBrowser():void
 			{
-				if (!_dataProvider)
+				if (!_filteredDataProvider)
 				{
 					return;
 				}
@@ -259,11 +251,7 @@
 					IBrowser( _browser ).allowMultipleSelection = _allowMultipleSelection;					
 				}
 				
-				var dp:ListCollectionView = new ListCollectionView( _dataProvider.list );
-				dp.sort = _dataProvider.sort;
-				dp.refresh();
-				
-				_browser.dataProvider = dp;
+				_browser.dataProvider = new ListCollectionView( _filteredDataProvider.list );
 				_browser.filterFunction = browserFilterFunctionWrapper;
 				_browser.title = "Browse";
 				_browser.labelFunction = _labelFunction;
